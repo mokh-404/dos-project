@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureCorp Enterprise Portal — DoS Lab</title>
+    <title>AAST Network Security — Victim Server</title>
     <style>
         :root {
             --primary: #0d1b2a;
@@ -129,8 +129,8 @@
     <div class="logo">
         <div class="logo-icon">🛡</div>
         <div>
-            <h1>SecureCorp Enterprise Portal</h1>
-            <p>Cybersecurity Training Environment — DoS Lab Simulation Target</p>
+            <h1>AAST Network Security</h1>
+            <p>Victim Server — DoS Lab Target</p>
         </div>
     </div>
     <div class="status-badge">
@@ -151,8 +151,8 @@
     <div class="alert-banner">
         <span>🔬</span>
         <div>
-            <strong>EDUCATIONAL LAB ENVIRONMENT</strong> — This server is a controlled simulation target
-            for DoS attack analysis and DFIR training. All traffic is monitored and logged.
+            <strong>AAST Network Security Lab</strong> — DoS simulation target.
+            All traffic is monitored and logged.
         </div>
     </div>
 
@@ -223,24 +223,24 @@
         <div class="panel">
             <h2>📊 Quick Metrics</h2>
             <div class="metric-row">
-                <span class="metric-name">CPU Cores</span>
-                <span class="metric-val">2</span>
+                <span class="metric-name">CPU Limit</span>
+                <span class="metric-val">0.15 cores</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-name">Memory Limit</span>
+                <span class="metric-val">48 MB</span>
             </div>
             <div class="metric-row">
                 <span class="metric-name">Max Workers</span>
-                <span class="metric-val">50</span>
+                <span class="metric-val">10</span>
             </div>
             <div class="metric-row">
-                <span class="metric-name">KeepAlive Timeout</span>
-                <span class="metric-val">5s</span>
+                <span class="metric-name">KeepAlive</span>
+                <span class="metric-val" style="color:#ff1744">OFF</span>
             </div>
             <div class="metric-row">
                 <span class="metric-name">Max Req/Worker</span>
-                <span class="metric-val">1000</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-name">Network</span>
-                <span class="metric-val">172.21.0.10</span>
+                <span class="metric-val">200</span>
             </div>
             <div class="metric-row">
                 <span class="metric-name">Log Format</span>
@@ -249,18 +249,11 @@
         </div>
     </div>
 
-    <div class="warning-box">
-        ⚠️ <strong>LEGAL DISCLAIMER:</strong> This server exists exclusively inside an isolated
-        Docker network for educational purposes. All simulated attacks are strictly
-        local. Do <strong>not</strong> replicate attack techniques against any external systems.
-        Unauthorized use of attack tools against real infrastructure is illegal.
-    </div>
+
 </main>
 
 <footer>
-    DoS Attack Simulation Lab — Educational Cybersecurity Environment &nbsp;|&nbsp;
-    Apache/2.4 Ubuntu 22.04 &nbsp;|&nbsp; Victim Node: 172.21.0.10 &nbsp;|&nbsp;
-    All activity monitored &amp; logged
+    AAST Network security project &nbsp;|&nbsp; Developed by the mother hackers
 </footer>
 
 <script>

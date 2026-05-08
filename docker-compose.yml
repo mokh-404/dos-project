@@ -28,9 +28,9 @@ services:
     environment:
       - APACHE_LOG_LEVEL=${APACHE_LOG_LEVEL:-warn}
     # ── Resource Limits (deliberately weak to simulate vulnerable server) ──
-    cpus: 0.25
-    mem_limit: 64m
-    memswap_limit: 64m
+    cpus: 0.15
+    mem_limit: 48m
+    memswap_limit: 48m
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost/health"]
@@ -51,9 +51,9 @@ services:
     environment:
       - TARGET_HOST=victim
       - TARGET_PORT=80
-      - ATTACK_RATE=${ATTACK_RATE:-200}
-      - ATTACK_DURATION=${ATTACK_DURATION:-30}
-      - ATTACK_CONCURRENCY=${ATTACK_CONCURRENCY:-50}
+      - ATTACK_RATE=${ATTACK_RATE:-500}
+      - ATTACK_DURATION=${ATTACK_DURATION:-60}
+      - ATTACK_CONCURRENCY=${ATTACK_CONCURRENCY:-200}
     cap_add: [NET_ADMIN, NET_RAW]
     depends_on:
       victim:

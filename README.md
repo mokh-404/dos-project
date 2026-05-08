@@ -30,7 +30,7 @@ This lab creates an **isolated Docker network** where you can safely simulate an
 
 | Container | Role | What it does |
 |---|---|---|
-| **victim** | Target server | Apache2 web server with **deliberately limited resources** (0.25 CPU, 64MB RAM, 10 workers) |
+| **victim** | Target server | Apache2 web server with **deliberately limited resources** (0.15 CPU, 48MB RAM, 10 workers) |
 | **attacker** | Attack tools | Contains `ab`, `siege`, `hping3`, `python3` for generating traffic |
 | **mitigation** | Defense layer | Nginx reverse proxy with rate limiting + Fail2Ban for IP blocking |
 | **packet_capture** | Forensics | Captures network traffic (PCAP files) for analysis |
@@ -42,11 +42,11 @@ This lab creates an **isolated Docker network** where you can safely simulate an
 
 The victim container is **intentionally crippled** to simulate a vulnerable, under-provisioned server:
 
-- **CPU**: 0.25 cores (25% of one core)
-- **Memory**: 64MB (no swap)
+- **CPU**: 0.15 cores (15% of one core)
+- **Memory**: 48MB (no swap)
 - **Workers**: Only 10 Apache worker processes
 
-This means when 50 concurrent connections hit it, the server **actually struggles** — response times spike from ~6ms to ~400ms, workers max out at 10/10, and only ~120 req/s get through instead of the 1,500+ it could handle with unlimited resources.
+This means when 200 concurrent connections hit it, the server **gets destroyed** — response times spike from ~5ms to **3,000ms+**, workers max out at 10/10, and only ~65 req/s get through instead of the 1,500+ it could handle with unlimited resources.
 
 ---
 
@@ -137,7 +137,7 @@ All attacks are run from the `dos_attacker` container. Use `docker exec` to trig
 #### Individual Attack Scenarios
 
 ```bash
-# Apache Benchmark — HTTP flood (50 concurrent, 30 seconds)
+# Apache Benchmark — HTTP flood (4 parallel streams x 200 concurrent, 60 seconds)
 docker exec -e SCENARIO=ab dos_attacker bash /scripts/simulate_load.sh
 
 # Siege — Multi-URL concurrent load
@@ -158,10 +158,10 @@ docker exec -e SCENARIO=all dos_attacker bash /scripts/simulate_load.sh
 Override defaults via environment variables:
 
 ```bash
-# Heavy attack: 500 req/s rate, 100 concurrent, 60 seconds
+# Even heavier attack: 1000 req/s rate, 500 concurrent, 60 seconds
 docker exec -e SCENARIO=ab \
-  -e ATTACK_RATE=500 \
-  -e ATTACK_CONCURRENCY=100 \
+  -e ATTACK_RATE=1000 \
+  -e ATTACK_CONCURRENCY=500 \
   -e ATTACK_DURATION=60 \
   dos_attacker bash /scripts/simulate_load.sh
 ```
@@ -327,12 +327,12 @@ After each attack, a summary report is generated in `./data/reports/summary_*.md
 - Response time: ~5ms
 - The victim website at http://localhost:8080 loads instantly
 
-### During Attack (50 concurrent connections)
-- Request rate: **100-130 req/s** (CPU-bottlenecked — server can't go faster)
+### During Attack (4 streams x 200 connections = 800 total)
+- Request rate: **65-80 req/s** (CPU-bottlenecked — server can't go faster)
 - Busy workers: **10/10** (maxed out — all workers occupied)
-- Response time: **400-900ms** (63x slower than normal!)
-- The victim website becomes **slow or unresponsive**
-- Only 3,600 of the potential 45,000 requests complete in 30 seconds
+- Response time: **3,000-27,000ms** (up to 27 SECONDS per request!)
+- The victim website takes **6-10 seconds to load** or times out completely
+- Only ~4,400 of the potential 30,000+ requests complete in 60 seconds
 
 ### After Attack
 - Workers drain back to idle within seconds
@@ -342,15 +342,15 @@ After each attack, a summary report is generated in `./data/reports/summary_*.md
 ### Why It Works
 
 The victim is limited to:
-- **0.25 CPU cores** → can only process ~120 req/s even at 100% CPU
-- **64MB RAM** → leaves very little memory for buffering
+- **0.15 CPU cores** → can only process ~65 req/s even at 100% CPU
+- **48MB RAM** → leaves very little memory for buffering
 - **10 Apache workers** → only 10 simultaneous requests can be handled, rest queue up
 - **KeepAlive disabled** → each request opens a new connection (more overhead)
 
-So when 50 concurrent connections flood the server, it:
+So when 800 simultaneous connections (4 streams x 200) flood the server for 60 seconds, it:
 1. **Exhausts all 10 workers** instantly
-2. **Queues remaining 40 connections** → they wait for a worker to free up
-3. **CPU maxes out at 0.25 cores** → each request takes longer to process
+2. **Queues remaining 790 connections** → massive queue backlog
+3. **CPU maxes out at 0.15 cores** → each request takes 9-27 seconds
 4. **Response time spirals** → 5ms → 400ms+ as the queue backs up
 
 ---
@@ -402,9 +402,9 @@ You'll see many `503` errors as Nginx rate-limits and Fail2Ban blocks the attack
 | `MITIGATION_PORT` | 8443 | Host port for mitigation proxy |
 | `PROMETHEUS_PORT` | 9090 | Host port for Prometheus |
 | `GRAFANA_PORT` | 3000 | Host port for Grafana |
-| `ATTACK_RATE` | 200 | Requests/sec for load tools |
-| `ATTACK_DURATION` | 30 | Attack duration in seconds |
-| `ATTACK_CONCURRENCY` | 50 | Concurrent connections |
+| `ATTACK_RATE` | 500 | Requests/sec for load tools |
+| `ATTACK_DURATION` | 60 | Attack duration in seconds |
+| `ATTACK_CONCURRENCY` | 200 | Concurrent connections |
 | `GRAFANA_USER` | admin | Grafana admin username |
 | `GRAFANA_PASSWORD` | doslab2024 | Grafana admin password |
 
@@ -412,9 +412,9 @@ You'll see many `503` errors as Nginx rate-limits and Fail2Ban blocks the attack
 
 | Resource | Value | Why |
 |---|---|---|
-| `cpus` | 0.25 | 25% of one CPU core — starves the server |
-| `mem_limit` | 64m | 64MB RAM — minimal memory |
-| `memswap_limit` | 64m | No swap — prevents memory overflow |
+| `cpus` | 0.15 | 15% of one CPU core — starves the server |
+| `mem_limit` | 48m | 48MB RAM — minimal memory |
+| `memswap_limit` | 48m | No swap — prevents memory overflow |
 | `MaxRequestWorkers` | 10 | Only 10 simultaneous requests handled |
 
 To make the victim stronger or weaker, edit these values in `docker-compose.yml` and `victim/apache/apache2.conf`, then rebuild:
@@ -436,13 +436,13 @@ docker compose up -d --build
 
 ### Victim container keeps restarting
 
-The 64MB memory limit may be too tight for your system. Increase `mem_limit` in `docker-compose.yml` to `128m`.
+The 48MB memory limit may be too tight for your system. Increase `mem_limit` in `docker-compose.yml` to `128m`.
 
 ### Attacks don't seem to affect the victim
 
 - Make sure you're attacking `victim:80` (direct) not `mitigation:80`
 - Check that resource limits are applied: `docker inspect dos_victim --format '{{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}'`
-- Should show `250000000` (0.25 CPU) and `67108864` (64MB)
+- Should show `150000000` (0.15 CPU) and `50331648` (48MB)
 
 ### Port already in use
 

