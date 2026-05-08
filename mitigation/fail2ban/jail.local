@@ -24,8 +24,8 @@ backend = auto
 banaction = iptables-multiport
 banaction_allports = iptables-allports
 
-# Ignore internal Docker networks
-ignoreip = 127.0.0.1/8 172.16.0.0/12 192.168.0.0/16 10.0.0.0/8
+# Only ignore localhost — Docker container IPs should NOT be ignored
+ignoreip = 127.0.0.1/8
 
 [sshd]
 enabled = false

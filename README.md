@@ -374,9 +374,7 @@ The mitigation container (Nginx + Fail2Ban) sits at http://localhost:8443 and en
 | `nginx-limit-req` | 5 rate-limit violations in 60s | 5 minutes | Nginx error logs |
 | `nginx-req-limit` | 200 requests in 60s | 10 minutes | Nginx access logs |
 | `apache-dos` | 300 requests in 60s | 10 minutes | Apache access logs |
-| `apache-overflows` | 2 buffer overflow errors in 10min | 5 minutes | Apache error logs |
-| `apache-noscript` | 5 script scan attempts in 10min | 5 minutes | Apache access logs |
-| `slowloris` | 2 slow connection errors in 10min | 30 minutes | Nginx error logs |
+| `apache-overflows` | 2 buffer overflow errors in 10min | 30 minutes | Apache error logs |
 
 ### Testing Mitigation
 
@@ -384,11 +382,20 @@ To see mitigation in action, attack through the Nginx proxy instead of directly:
 
 ```bash
 # Attack through the mitigation layer (port 8443)
-docker exec -e TARGET_HOST=mitigation -e TARGET_PORT=80 \
-  -e SCENARIO=ab dos_attacker bash /scripts/simulate_load.sh
+docker exec -e TARGET_HOST=mitigation -e TARGET_PORT=80 -e SCENARIO=ab dos_attacker bash /scripts/simulate_load.sh
 ```
 
-You'll see many `503` errors as Nginx rate-limits and Fail2Ban blocks the attacker's IP.
+**What you'll see:**
+- **Rate limiting kicks in immediately** — Nginx blocks most requests with `429 Too Many Requests`
+- **Fail2ban bans the attacker IP** — after detecting the flood, the attacker gets banned via iptables
+- Out of ~7,500 requests, only ~80-90 get through (vs 4,400+ hitting victim directly)
+
+**Check bans:**
+```bash
+# See which IPs are banned
+docker exec dos_mitigation fail2ban-client status nginx-limit-req
+docker exec dos_mitigation fail2ban-client status nginx-req-limit
+```
 
 ---
 
@@ -403,7 +410,7 @@ You'll see many `503` errors as Nginx rate-limits and Fail2Ban blocks the attack
 | `PROMETHEUS_PORT` | 9090 | Host port for Prometheus |
 | `GRAFANA_PORT` | 3000 | Host port for Grafana |
 | `ATTACK_RATE` | 500 | Requests/sec for load tools |
-| `ATTACK_DURATION` | 60 | Attack duration in seconds |
+| `ATTACK_DURATION` | 30 | Attack duration in seconds |
 | `ATTACK_CONCURRENCY` | 200 | Concurrent connections |
 | `GRAFANA_USER` | admin | Grafana admin username |
 | `GRAFANA_PASSWORD` | doslab2024 | Grafana admin password |
