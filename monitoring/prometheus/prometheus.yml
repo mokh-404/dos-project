@@ -1,0 +1,34 @@
+# ============================================================
+# Prometheus Configuration — DoS Lab
+# ============================================================
+
+global:
+  scrape_interval:     5s
+  evaluation_interval: 5s
+  scrape_timeout:      5s
+  external_labels:
+    monitor: 'dos-lab'
+
+rule_files:
+  - "rules/dos_alerts.yml"
+
+scrape_configs:
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Apache Exporter — translates mod_status into Prometheus metrics
+  - job_name: 'apache'
+    static_configs:
+      - targets: ['apache-exporter:9117']
+        labels:
+          instance: 'victim-apache'
+    metrics_path: '/metrics'
+
+  # Grafana health
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    metrics_path: '/metrics'

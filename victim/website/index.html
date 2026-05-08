@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureCorp Enterprise Portal — DoS Lab</title>
+    <style>
+        :root {
+            --primary: #0d1b2a;
+            --accent:  #1e88e5;
+            --green:   #00e676;
+            --red:     #ff1744;
+            --text:    #e8eaf6;
+            --card-bg: #1a2744;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--primary);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        header {
+            background: linear-gradient(135deg, #0a1628 0%, #1e3a5f 100%);
+            border-bottom: 2px solid var(--accent);
+            padding: 1.2rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo { display:flex; align-items:center; gap:1rem; }
+        .logo-icon {
+            width:48px; height:48px; background:var(--accent);
+            border-radius:10px; display:flex; align-items:center;
+            justify-content:center; font-size:24px;
+        }
+        .logo h1 { font-size:1.4rem; font-weight:700; }
+        .logo p  { font-size:0.75rem; color:#90caf9; }
+        .status-badge {
+            display:flex; align-items:center; gap:0.5rem;
+            background:#0d2137; border:1px solid var(--green);
+            padding:0.4rem 1rem; border-radius:20px; font-size:0.8rem;
+        }
+        .dot { width:8px; height:8px; border-radius:50%; background:var(--green);
+               animation:pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+        nav {
+            background:#112033; border-bottom:1px solid #1e3a5f;
+            padding:0 2rem; display:flex; gap:0; overflow-x:auto;
+        }
+        nav a {
+            display:inline-block; padding:0.8rem 1.5rem;
+            color:#90caf9; text-decoration:none; font-size:0.85rem;
+            border-bottom:3px solid transparent; white-space:nowrap;
+            transition:all .2s;
+        }
+        nav a:hover, nav a.active {
+            color:#fff; border-bottom-color:var(--accent); background:#1a3050;
+        }
+
+        main { max-width:1200px; margin:2rem auto; padding:0 1.5rem; }
+
+        .alert-banner {
+            background:linear-gradient(90deg,#7b1fa2,#1565c0);
+            border:1px solid #9c27b0; border-radius:8px;
+            padding:0.8rem 1.5rem; margin-bottom:2rem;
+            font-size:0.85rem; display:flex; align-items:center; gap:1rem;
+        }
+        .alert-banner span { font-size:1.2rem; }
+
+        .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1.5rem; margin-bottom:2rem; }
+        .card {
+            background:var(--card-bg); border:1px solid #1e3a5f;
+            border-radius:12px; padding:1.5rem; transition:transform .2s;
+        }
+        .card:hover { transform:translateY(-2px); border-color:var(--accent); }
+        .card-icon { font-size:2rem; margin-bottom:0.5rem; }
+        .card h3 { font-size:0.8rem; color:#90caf9; text-transform:uppercase;
+                   letter-spacing:.05em; margin-bottom:0.3rem; }
+        .card .value { font-size:2rem; font-weight:700; color:var(--green); }
+        .card .sub { font-size:0.75rem; color:#64b5f6; margin-top:0.3rem; }
+
+        .panels { display:grid; grid-template-columns:2fr 1fr; gap:1.5rem; }
+
+        .panel {
+            background:var(--card-bg); border:1px solid #1e3a5f;
+            border-radius:12px; padding:1.5rem;
+        }
+        .panel h2 {
+            font-size:0.9rem; color:#90caf9; text-transform:uppercase;
+            letter-spacing:.08em; margin-bottom:1rem;
+            border-bottom:1px solid #1e3a5f; padding-bottom:0.5rem;
+        }
+        table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+        th { color:#64b5f6; text-align:left; padding:0.5rem 0.8rem;
+             border-bottom:1px solid #1e3a5f; }
+        td { padding:0.5rem 0.8rem; border-bottom:1px solid #0d1b2a; }
+        tr:hover td { background:#1e3a5f22; }
+        .badge {
+            display:inline-block; padding:0.2rem 0.6rem;
+            border-radius:4px; font-size:0.75rem; font-weight:600;
+        }
+        .badge-green  { background:#1b5e2022; color:var(--green); border:1px solid var(--green)44; }
+        .badge-yellow { background:#f9a82522; color:#ffd54f;  border:1px solid #f9a82544; }
+        .badge-red    { background:#b71c1c22; color:var(--red);   border:1px solid #b71c1c44; }
+        .badge-blue   { background:#0d47a122; color:#64b5f6; border:1px solid #0d47a144; }
+
+        .metric-row { display:flex; justify-content:space-between; align-items:center;
+                      padding:0.6rem 0; border-bottom:1px solid #0d1b2a; }
+        .metric-row:last-child { border-bottom:none; }
+        .metric-name { font-size:0.8rem; color:#90caf9; }
+        .metric-val  { font-size:0.9rem; font-weight:700; color:var(--green); }
+
+        footer {
+            background:#0a1628; border-top:1px solid #1e3a5f;
+            padding:1rem 2rem; text-align:center;
+            font-size:0.75rem; color:#546e7a; margin-top:3rem;
+        }
+        .warning-box {
+            background:#1b0000; border:1px solid #b71c1c;
+            border-radius:8px; padding:1rem 1.5rem; margin:1.5rem 0;
+            font-size:0.82rem; color:#ef9a9a;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div class="logo">
+        <div class="logo-icon">🛡</div>
+        <div>
+            <h1>SecureCorp Enterprise Portal</h1>
+            <p>Cybersecurity Training Environment — DoS Lab Simulation Target</p>
+        </div>
+    </div>
+    <div class="status-badge">
+        <div class="dot"></div>
+        <span>Server Online</span>
+    </div>
+</header>
+
+<nav>
+    <a href="/" class="active">Dashboard</a>
+    <a href="/server-status">Server Status</a>
+    <a href="/about.html">About</a>
+    <a href="/api.html">API Docs</a>
+    <a href="/contact.html">Contact</a>
+</nav>
+
+<main>
+    <div class="alert-banner">
+        <span>🔬</span>
+        <div>
+            <strong>EDUCATIONAL LAB ENVIRONMENT</strong> — This server is a controlled simulation target
+            for DoS attack analysis and DFIR training. All traffic is monitored and logged.
+        </div>
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <div class="card-icon">🌐</div>
+            <h3>Server Status</h3>
+            <div class="value">ONLINE</div>
+            <div class="sub">Apache/2.4 on Ubuntu 22.04</div>
+        </div>
+        <div class="card">
+            <div class="card-icon">📡</div>
+            <h3>Active Sessions</h3>
+            <div class="value" id="sessions">—</div>
+            <div class="sub">Concurrent connections</div>
+        </div>
+        <div class="card">
+            <div class="card-icon">⏱</div>
+            <h3>Uptime</h3>
+            <div class="value" id="uptime">—</div>
+            <div class="sub">Since container start</div>
+        </div>
+        <div class="card">
+            <div class="card-icon">🔒</div>
+            <h3>Environment</h3>
+            <div class="value" style="font-size:1rem;color:#ffd54f">LAB</div>
+            <div class="sub">Isolated Docker network</div>
+        </div>
+    </div>
+
+    <div class="panels">
+        <div class="panel">
+            <h2>📋 Simulated Asset Registry</h2>
+            <table>
+                <thead>
+                    <tr><th>Service</th><th>Port</th><th>Status</th><th>Type</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Apache Web Server</td><td>80</td>
+                        <td><span class="badge badge-green">Online</span></td>
+                        <td><span class="badge badge-blue">HTTP</span></td>
+                    </tr>
+                    <tr>
+                        <td>Server Status</td><td>80/server-status</td>
+                        <td><span class="badge badge-green">Online</span></td>
+                        <td><span class="badge badge-blue">Monitor</span></td>
+                    </tr>
+                    <tr>
+                        <td>Health Endpoint</td><td>80/health</td>
+                        <td><span class="badge badge-green">Online</span></td>
+                        <td><span class="badge badge-blue">JSON</span></td>
+                    </tr>
+                    <tr>
+                        <td>Metrics Exporter</td><td>9117</td>
+                        <td><span class="badge badge-yellow">Sidecar</span></td>
+                        <td><span class="badge badge-blue">Prometheus</span></td>
+                    </tr>
+                    <tr>
+                        <td>Access Logs</td><td>—</td>
+                        <td><span class="badge badge-green">Active</span></td>
+                        <td><span class="badge badge-blue">Log</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="panel">
+            <h2>📊 Quick Metrics</h2>
+            <div class="metric-row">
+                <span class="metric-name">CPU Cores</span>
+                <span class="metric-val">2</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-name">Max Workers</span>
+                <span class="metric-val">50</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-name">KeepAlive Timeout</span>
+                <span class="metric-val">5s</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-name">Max Req/Worker</span>
+                <span class="metric-val">1000</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-name">Network</span>
+                <span class="metric-val">172.21.0.10</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-name">Log Format</span>
+                <span class="metric-val">Forensic</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="warning-box">
+        ⚠️ <strong>LEGAL DISCLAIMER:</strong> This server exists exclusively inside an isolated
+        Docker network for educational purposes. All simulated attacks are strictly
+        local. Do <strong>not</strong> replicate attack techniques against any external systems.
+        Unauthorized use of attack tools against real infrastructure is illegal.
+    </div>
+</main>
+
+<footer>
+    DoS Attack Simulation Lab — Educational Cybersecurity Environment &nbsp;|&nbsp;
+    Apache/2.4 Ubuntu 22.04 &nbsp;|&nbsp; Victim Node: 172.21.0.10 &nbsp;|&nbsp;
+    All activity monitored &amp; logged
+</footer>
+
+<script>
+    // Simple uptime counter
+    const start = Date.now();
+    function updateUptime() {
+        const secs = Math.floor((Date.now() - start) / 1000);
+        const m = Math.floor(secs / 60), s = secs % 60;
+        document.getElementById('uptime').textContent =
+            (m > 0 ? m + 'm ' : '') + s + 's';
+    }
+    setInterval(updateUptime, 1000);
+    updateUptime();
+
+    // Simulate connection counter (cosmetic for lab)
+    let base = 1;
+    function updateSessions() {
+        const delta = Math.floor(Math.random() * 3) - 1;
+        base = Math.max(1, Math.min(50, base + delta));
+        document.getElementById('sessions').textContent = base;
+    }
+    setInterval(updateSessions, 2000);
+    updateSessions();
+</script>
+</body>
+</html>

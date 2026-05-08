@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>API Docs — SecureCorp DoS Lab</title>
+    <style>
+        body { font-family:'Segoe UI',system-ui,sans-serif; background:#0d1b2a; color:#e8eaf6;
+               max-width:900px; margin:3rem auto; padding:0 1.5rem; line-height:1.7; }
+        h1 { color:#1e88e5; }
+        h2 { color:#64b5f6; margin:2rem 0 0.5rem; border-bottom:1px solid #1e3a5f; padding-bottom:.3rem; }
+        code { background:#112033; border:1px solid #1e3a5f; padding:.2rem .5rem; border-radius:4px;
+               font-family:monospace; color:#80cbc4; }
+        pre  { background:#112033; border:1px solid #1e3a5f; border-radius:8px; padding:1rem;
+               overflow-x:auto; }
+        pre code { background:none; border:none; padding:0; }
+        .method { display:inline-block; padding:.2rem .6rem; border-radius:4px;
+                  font-size:.75rem; font-weight:700; margin-right:.5rem; }
+        .get { background:#1b5e20; color:#a5d6a7; }
+        .back { display:inline-block; margin-bottom:2rem; color:#1e88e5; text-decoration:none;
+                background:#112033; padding:.5rem 1rem; border-radius:6px; font-size:.85rem; }
+        a { color:#1e88e5; }
+    </style>
+</head>
+<body>
+    <a href="/" class="back">← Back to Dashboard</a>
+    <h1>Simulated API Endpoints</h1>
+    <p style="color:#90caf9">Simulated endpoints for generating varied request patterns during load testing.</p>
+
+    <h2>Health Check</h2>
+    <p><span class="method get">GET</span> <code>/health</code></p>
+    <pre><code>{
+  "status": "healthy",
+  "service": "apache-victim",
+  "version": "1.0"
+}</code></pre>
+
+    <h2>Server Status (Prometheus scrape target)</h2>
+    <p><span class="method get">GET</span> <code>/server-status?auto</code></p>
+    <p>Returns Apache mod_status output. Accessible from monitoring network only.</p>
+
+    <h2>Simulated Endpoints for Load Testing</h2>
+    <p>These endpoints serve static content to simulate realistic request patterns:</p>
+    <ul style="color:#b0bec5">
+        <li><code>/</code> — Main dashboard page</li>
+        <li><code>/about.html</code> — About page</li>
+        <li><code>/api.html</code> — This page</li>
+        <li><code>/contact.html</code> — Contact page</li>
+        <li><code>/health</code> — Health check (JSON)</li>
+    </ul>
+</body>
+</html>

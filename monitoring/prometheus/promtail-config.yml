@@ -1,0 +1,89 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # ── Apache Access Log ──────────────────────────────────────
+  - job_name: apache_access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: apache
+          log_type: access
+          container: victim
+          environment: dos-lab
+          __path__: /var/log/apache2/access.log
+
+    pipeline_stages:
+      # Parse combined log format
+      - regex:
+          expression: >
+            ^(?P<remote_addr>\S+) \S+ (?P<user>\S+)
+            \[(?P<time>[^\]]+)\]
+            "(?P<method>\S+) (?P<request>[^ "]+)? HTTP/[0-9.]+"
+            (?P<status>[0-9]{3})
+            (?P<bytes_sent>\d+|-)
+            "(?P<referer>[^"]*)"
+            "(?P<user_agent>[^"]*)"
+            (?P<request_time>\d+)?
+
+      - labels:
+          remote_addr:
+          method:
+          status:
+          request:
+
+      - timestamp:
+          source: time
+          format: "02/Jan/2006:15:04:05 -0700"
+
+      - metrics:
+          http_requests_total:
+            type: Counter
+            description: "Total HTTP requests"
+            source: status
+            config:
+              action: inc
+
+  # ── Apache Error Log ───────────────────────────────────────
+  - job_name: apache_error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: apache
+          log_type: error
+          container: victim
+          environment: dos-lab
+          __path__: /var/log/apache2/error.log
+
+    pipeline_stages:
+      - regex:
+          expression: >
+            ^\[(?P<time>[^\]]+)\]
+            \[(?P<module>[^\]]+)\]
+            \[(?P<level>[^\]]+)\]
+            (?P<message>.+)
+
+      - labels:
+          level:
+          module:
+
+  # ── DoS Analysis Log ───────────────────────────────────────
+  - job_name: dos_analysis_log
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: apache
+          log_type: dos_analysis
+          container: victim
+          environment: dos-lab
+          __path__: /var/log/apache2/dos_analysis.log

@@ -1,0 +1,70 @@
+# ============================================================
+# Prometheus Alert Rules — DoS Detection
+# DoS Lab — Educational Use Only
+# ============================================================
+
+groups:
+  - name: dos_detection
+    interval: 10s
+    rules:
+
+      # ── High request rate alert ───────────────────────────
+      - alert: HighApacheRequestRate
+        expr: rate(apache_accesses_total[1m]) > 50
+        for: 30s
+        labels:
+          severity: warning
+          category: dos_detection
+        annotations:
+          summary: "High Apache request rate detected"
+          description: >
+            Apache is receiving {{ printf "%.0f" $value }} req/s,
+            which exceeds the warning threshold of 50 req/s.
+
+      # ── Very high request rate ────────────────────────────
+      - alert: CriticalApacheRequestRate
+        expr: rate(apache_accesses_total[1m]) > 200
+        for: 15s
+        labels:
+          severity: critical
+          category: dos_detection
+        annotations:
+          summary: "Critical Apache request rate — possible DoS"
+          description: >
+            Apache request rate has reached {{ printf "%.0f" $value }} req/s.
+
+      # ── Workers exhaustion ────────────────────────────────
+      - alert: ApacheWorkersExhausted
+        expr: apache_workers{state="busy"} > 8
+        for: 10s
+        labels:
+          severity: warning
+          category: resource_exhaustion
+        annotations:
+          summary: "Apache worker pool nearly exhausted"
+          description: >
+            {{ $value }} of 10 Apache workers are busy.
+            Server degradation imminent.
+
+      # ── High throughput alert ──────────────────────────────
+      - alert: HighApacheThroughput
+        expr: rate(apache_sent_kilobytes_total[1m]) > 5000
+        for: 30s
+        labels:
+          severity: warning
+          category: dos_detection
+        annotations:
+          summary: "High Apache bandwidth usage"
+          description: >
+            Apache is sending {{ printf "%.0f" $value }} KB/s.
+
+      # ── Apache scoreboard stalled ─────────────────────────
+      - alert: ApacheScoreboardStalled
+        expr: apache_scoreboard{state="waiting"} == 0
+        for: 60s
+        labels:
+          severity: info
+          category: availability
+        annotations:
+          summary: "Apache may be under load stress"
+          description: "No idle workers remaining in Apache scoreboard."

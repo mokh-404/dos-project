@@ -1,0 +1,168 @@
+# ============================================================
+#  DoS Attack Simulation & Analysis Lab
+#  Educational Cybersecurity Training Environment
+# ============================================================
+#  EDUCATIONAL USE ONLY — ISOLATED LAB ENVIRONMENT
+#  Do NOT deploy on public networks or target external systems.
+# ============================================================
+
+networks:
+  lab_net:
+    driver: bridge
+
+services:
+
+  # ── VICTIM — Apache2 Web Server ────────────────────────────
+  victim:
+    build: ./victim
+    container_name: dos_victim
+    hostname: victim
+    networks: [lab_net]
+    ports:
+      - "${VICTIM_PORT:-8080}:80"
+    volumes:
+      - ./victim/website:/var/www/html:ro
+      - ./victim/apache/apache2.conf:/etc/apache2/apache2.conf:ro
+      - ./victim/apache/000-default.conf:/etc/apache2/sites-available/000-default.conf:ro
+      - ./data/logs:/var/log/apache2
+    environment:
+      - APACHE_LOG_LEVEL=${APACHE_LOG_LEVEL:-warn}
+    # ── Resource Limits (deliberately weak to simulate vulnerable server) ──
+    cpus: 0.25
+    mem_limit: 64m
+    memswap_limit: 64m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── ATTACKER — Load Simulation Tools ───────────────────────
+  attacker:
+    build: ./attacker
+    container_name: dos_attacker
+    hostname: attacker
+    networks: [lab_net]
+    volumes:
+      - ./attacker/scripts:/scripts:ro
+      - ./data/reports:/reports
+    environment:
+      - TARGET_HOST=victim
+      - TARGET_PORT=80
+      - ATTACK_RATE=${ATTACK_RATE:-200}
+      - ATTACK_DURATION=${ATTACK_DURATION:-30}
+      - ATTACK_CONCURRENCY=${ATTACK_CONCURRENCY:-50}
+    cap_add: [NET_ADMIN, NET_RAW]
+    depends_on:
+      victim:
+        condition: service_healthy
+
+  # ── PACKET CAPTURE — Tshark / Tcpdump ──────────────────────
+  packet_capture:
+    build: ./packet_capture
+    container_name: dos_packet_capture
+    hostname: packet-capture
+    networks: [lab_net]
+    volumes:
+      - ./data/captures:/captures
+    environment:
+      - CAPTURE_INTERFACE=${CAPTURE_INTERFACE:-eth0}
+      - CAPTURE_FILTER=${CAPTURE_FILTER:-tcp port 80}
+      - CAPTURE_ROTATE_SECONDS=${CAPTURE_ROTATE_SECONDS:-60}
+    cap_add: [NET_ADMIN, NET_RAW]
+    restart: unless-stopped
+    depends_on:
+      victim:
+        condition: service_healthy
+
+  # ── MITIGATION — Nginx Reverse Proxy + Fail2Ban ────────────
+  mitigation:
+    build: ./mitigation
+    container_name: dos_mitigation
+    hostname: mitigation
+    networks: [lab_net]
+    ports:
+      - "${MITIGATION_PORT:-8443}:80"
+    volumes:
+      - ./mitigation/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./mitigation/fail2ban/jail.local:/etc/fail2ban/jail.local:ro
+      - ./data/logs:/var/log/apache2:ro
+    cap_add: [NET_ADMIN]
+    depends_on:
+      victim:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── PROMETHEUS — Metrics Collection ────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: dos_prometheus
+    hostname: prometheus
+    networks: [lab_net]
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - ./data/prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=3d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── APACHE EXPORTER — Translates mod_status → Prometheus ───
+  apache_exporter:
+    image: lusotycoon/apache-exporter:v0.13.4
+    container_name: dos_apache_exporter
+    hostname: apache-exporter
+    networks: [lab_net]
+    command: ['--scrape_uri=http://victim/server-status?auto']
+    depends_on:
+      victim:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── GRAFANA — Visualization Dashboard ──────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: dos_grafana
+    hostname: grafana
+    networks: [lab_net]
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-doslab2024}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_LOG_LEVEL=warn
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/dos_lab_overview.json
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+

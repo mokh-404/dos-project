@@ -1,0 +1,74 @@
+# ============================================================
+# Fail2Ban Configuration — DoS Lab
+# ============================================================
+# Monitors Nginx access logs for DoS patterns
+# and applies temporary IP bans.
+#
+# ⚠ EDUCATIONAL CONFIGURATION — Lab environment only
+# ============================================================
+
+[DEFAULT]
+# Ban time in seconds (5 minutes for lab demo)
+bantime  = 300
+
+# Time window to count failures
+findtime = 60
+
+# Max failures before ban
+maxretry = 30
+
+# Backend for log monitoring
+backend = auto
+
+# Action (only log in lab — no real iptables in container by default)
+banaction = iptables-multiport
+banaction_allports = iptables-allports
+
+# Ignore internal Docker networks
+ignoreip = 127.0.0.1/8 172.16.0.0/12 192.168.0.0/16 10.0.0.0/8
+
+[sshd]
+enabled = false
+
+[nginx-http-auth]
+enabled  = false
+
+# ── Nginx Rate Limit Jail ─────────────────────────────────────
+[nginx-limit-req]
+enabled  = true
+port     = http,https
+filter   = nginx-limit-req
+logpath  = /var/log/nginx/error.log
+maxretry = 5
+findtime = 60
+bantime  = 300
+
+# ── Nginx Flood Detection ─────────────────────────────────────
+[nginx-req-limit]
+enabled  = true
+filter   = nginx-req-limit
+logpath  = /var/log/nginx/access.log
+maxretry = 200
+findtime = 60
+bantime  = 600
+
+# ── Apache Flood Detection ────────────────────────────────────
+[apache-dos]
+enabled  = true
+port     = http,https
+filter   = apache-dos
+logpath  = /var/log/apache2/access.log
+maxretry = 300
+findtime = 60
+bantime  = 600
+action   = iptables-allports[name=apache-dos]
+
+# ── Slow Connection (SlowLoris) detection ────────────────────
+[apache-overflows]
+enabled  = true
+port     = http,https
+filter   = apache-overflows
+logpath  = /var/log/apache2/error.log
+maxretry = 2
+findtime = 600
+bantime  = 1800
